@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>สร้างคำร้องซ่อม - ระบบแจ้งซ่อมอุปกรณ์</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="navbar-brand">🔧 ระบบแจ้งซ่อมอุปกรณ์</a>
+            <div class="navbar-menu">
+                <a href="dashboard.html">หน้าหลัก</a>
+                <a href="repair-requests.html">คำร้องซ่อม</a>
+                <a href="equipment.html">อุปกรณ์</a>
+                <a href="profile.html">โปรไฟล์</a>
+                <span id="userName" style="color: #64748b;"></span>
+                <button id="logoutBtn" class="btn-logout">ออกจากระบบ</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-between align-center">
+                    <h2>สร้างคำร้องซ่อมใหม่</h2>
+                    <a href="repair-requests.html" class="btn btn-secondary">← กลับ</a>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+            <div id="successMessage" class="alert alert-success" style="display: none;"></div>
+            
+            <form id="createRequestForm">
+                
+                <div class="form-group">
+                    <label for="equipment" class="form-label">เลือกอุปกรณ์ที่ต้องการซ่อม *</label>
+                    <select id="equipment" name="equipment" class="form-control" required>
+                        <option value="">-- กรุณาเลือกอุปกรณ์ --</option>
+                        </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="title" class="form-label">หัวข้อ *</label>
+                    <input type="text" id="title" name="title" class="form-control" placeholder="เช่น เครื่องพิมพ์ไม่สามารถพิมพ์ได้" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="description" class="form-label">รายละเอียดปัญหา *</label>
+                    <textarea id="description" name="description" class="form-control" rows="5" placeholder="กรุณาอธิบายปัญหาโดยละเอียด..." required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="priority" class="form-label">ความสำคัญ *</label>
+                    <select id="priority" name="priority" class="form-control" required>
+                        <option value="low">ต่ำ</option>
+                        <option value="medium" selected>ปานกลาง</option>
+                        <option value="high">สูง</option>
+                        <option value="urgent">เร่งด่วน</option>
+                    </select>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">บันทึกคำร้อง</button>
+                    <a href="repair-requests.html" class="btn btn-secondary">ยกเลิก</a>
+                </div>
+                
+            </form> </div>
+    </div>
+
+    <script src="assets/js/api.js"></script>
+    <script src="assets/js/auth.js"></script>
+    
+    <script>
+        // 1. ตรวจสอบการล็อกอินก่อน
+        requireAuth();
+
+        // 2. "นิยาม" ฟังก์ชันไว้ก่อน (ยังไม่ทำงาน)
+        async function loadEquipment() {
+            try {
+                const response = await equipmentAPI.getAvailable();
+                const select = document.getElementById('equipment');
+                
+                if (!response.results) {
+                    console.error('Invalid response structure from getAvailable()');
+                    showError('ข้อมูลอุปกรณ์ที่ได้รับผิดพลาด');
+                    return;
+                }
+
+                response.results.forEach(equipment => {
+                    const option = document.createElement('option');
+                    option.value = equipment.id;
+                    
+                    // [FIX 3] แก้เป็น equipment.code (จาก equipment.equipment_code)
+                    option.textContent = `${equipment.code} - ${equipment.name} (${equipment.location})`; 
+                    
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading equipment:', error);
+                showError('ไม่สามารถโหลดรายการอุปกรณ์ได้');
+            }
+        }
+
+        // 3. "รอ" ให้ HTML โหลดเสร็จก่อน
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // 4. "เรียกใช้" ฟังก์ชันโหลด dropdown
+            loadEquipment();
+
+            // 5. "ค้นหา" ฟอร์มและ "เพิ่ม" event listener (ย้ายจากข้างนอกเข้ามาข้างใน)
+            const form = document.getElementById('createRequestForm');
+            
+            if (form) {
+                form.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+
+                    const errorDiv = document.getElementById('errorMessage');
+                    const successDiv = document.getElementById('successMessage');
+                    errorDiv.style.display = 'none';
+                    successDiv.style.display = 'none';
+
+                    // (ใช้ตัวแปร form ที่หาเจอแล้ว)
+                    const formData = new FormData(form);
+                    const data = {
+                        equipment: parseInt(formData.get('equipment')),
+                        title: formData.get('title'),
+                        description: formData.get('description'),
+                        priority: formData.get('priority')
+                    };
+
+                    try {
+                        // ตรวจสอบว่าเลือกอุปกรณ์หรือยัง
+                        if (!data.equipment) {
+                            throw { equipment: ['กรุณาเลือกอุปกรณ์'] };
+                        }
+                        
+                        const result = await repairAPI.create(data);
+                        
+                        successDiv.style.display = 'block';
+                        successDiv.textContent = `สร้างคำร้องสำเร็จ! เลขที่คำร้อง: ${result.request_number}`;
+
+                        form.reset();
+
+                        setTimeout(() => {
+                            window.location.href = 'repair-requests.html';
+                        }, 2000);
+
+                    } catch (error) {
+                        console.error('Error creating request:', error);
+                        errorDiv.style.display = 'block';
+                        
+                        if (error.equipment) {
+                            errorDiv.textContent = 'กรุณาเลือกอุปกรณ์';
+                        } else if (error.title) {
+                            errorDiv.textContent = 'กรุณากรอกหัวข้อ';
+                        } else if (error.description) {
+                            errorDiv.textContent = 'กรุณากรอกรายละเอียดปัญหา';
+                        } else {
+                            errorDiv.textContent = 'ไม่สามารถสร้างคำร้องได้ กรุณาลองใหม่อีกครั้ง';
+                        }
+                    }
+                });
+            } else {
+                console.error("CRITICAL ERROR: ไม่พบ Form ที่มี id 'createRequestForm'");
+                showError("เกิดข้อผิดพลาดในการโหลดฟอร์ม");
+            }
+        });
+    </script>
+    </body>
+</html>
