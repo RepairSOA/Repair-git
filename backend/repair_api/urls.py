@@ -1,70 +1,51 @@
 """
-URL configuration for repair_project project.
+URL configuration for repair_api app
 """
-from django.contrib import admin
 from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+    TokenVerifyView,
+)
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework import permissions
-from drf_yasg.views import get_schema_view
-from drf_yasg import openapi
 
-# Schema view สำหรับ API documentation
-schema_view = get_schema_view(
-    openapi.Info(
-        title="Repair System API",
-        default_version='v1',
-        description="API Documentation for Repair System",
-        terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@repairsystem.local"),
-        license=openapi.License(name="BSD License"),
-    ),
-    public=True,
-    permission_classes=(permissions.AllowAny,),
-)
+# สร้าง router สำหรับ ViewSets (ถ้ามี)
+router = DefaultRouter()
 
-# Health check view
+# ถ้ามี ViewSets ให้ register ที่นี่
+# ตัวอย่าง:
+# from .views import RepairViewSet
+# router.register(r'repairs', RepairViewSet, basename='repair')
+
+# API Info view
 @csrf_exempt
-def health_check(request):
-    """Simple health check endpoint"""
+def api_root(request):
+    """API root endpoint"""
     return JsonResponse({
-        'status': 'ok',
-        'message': 'Repair System API is running',
-        'version': '1.0.0'
-    })
-
-# Home/Root view
-@csrf_exempt
-def home_view(request):
-    """Root endpoint with API information"""
-    return JsonResponse({
-        'message': 'Welcome to Repair System API',
-        'version': '1.0.0',
+        'message': 'Repair System API v1',
         'endpoints': {
-            'admin': '/admin/',
-            'api': '/api/',
+            'auth': {
+                'login': '/api/auth/login/',
+                'refresh': '/api/auth/refresh/',
+                'verify': '/api/auth/verify/',
+            },
             'docs': '/swagger/',
-            'redoc': '/redoc/',
-            'health': '/health/'
-        },
-        'status': 'active'
+        }
     })
 
 urlpatterns = [
-    # Admin
-    path('admin/', admin.site.urls),
+    # API Root
+    path('', api_root, name='api-root'),
     
-    # Root endpoint
-    path('', home_view, name='home'),
+    # Authentication endpoints
+    path('auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('auth/verify/', TokenVerifyView.as_view(), name='token_verify'),
     
-    # Health check
-    path('health/', health_check, name='health'),
+    # Router URLs (ViewSets)
+    path('', include(router.urls)),
     
-    # API endpoints
-    path('api/', include('repair_api.urls')),
-    
-    # API Documentation
-    path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    # เพิ่ม URL patterns อื่นๆ ของคุณที่นี่
 ]
