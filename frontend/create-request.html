@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
+    <!-- Navbar -->
     <nav class="navbar">
         <div class="container">
             <a href="dashboard.html" class="navbar-brand">🔧 ระบบแจ้งซ่อมอุปกรณ์</a>
@@ -21,6 +22,7 @@
         </div>
     </nav>
 
+    <!-- Main Content -->
     <div class="container">
         <div class="card">
             <div class="card-header">
@@ -32,29 +34,28 @@
 
             <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
             <div id="successMessage" class="alert alert-success" style="display: none;"></div>
-            
+
             <form id="createRequestForm">
-                
                 <div class="form-group">
                     <label for="equipment" class="form-label">เลือกอุปกรณ์ที่ต้องการซ่อม *</label>
-                    <select id="equipment" name="equipment" class="form-control" required>
+                    <select id="equipment" class="form-control" required>
                         <option value="">-- กรุณาเลือกอุปกรณ์ --</option>
-                        </select>
+                    </select>
                 </div>
 
                 <div class="form-group">
                     <label for="title" class="form-label">หัวข้อ *</label>
-                    <input type="text" id="title" name="title" class="form-control" placeholder="เช่น เครื่องพิมพ์ไม่สามารถพิมพ์ได้" required>
+                    <input type="text" id="title" class="form-control" placeholder="เช่น เครื่องพิมพ์ไม่สามารถพิมพ์ได้" required>
                 </div>
 
                 <div class="form-group">
                     <label for="description" class="form-label">รายละเอียดปัญหา *</label>
-                    <textarea id="description" name="description" class="form-control" rows="5" placeholder="กรุณาอธิบายปัญหาโดยละเอียด..." required></textarea>
+                    <textarea id="description" class="form-control" rows="5" placeholder="กรุณาอธิบายปัญหาโดยละเอียด..." required></textarea>
                 </div>
 
                 <div class="form-group">
                     <label for="priority" class="form-label">ความสำคัญ *</label>
-                    <select id="priority" name="priority" class="form-control" required>
+                    <select id="priority" class="form-control" required>
                         <option value="low">ต่ำ</option>
                         <option value="medium" selected>ปานกลาง</option>
                         <option value="high">สูง</option>
@@ -66,108 +67,116 @@
                     <button type="submit" class="btn btn-primary">บันทึกคำร้อง</button>
                     <a href="repair-requests.html" class="btn btn-secondary">ยกเลิก</a>
                 </div>
-                
-            </form> </div>
+            </form>
+        </div>
     </div>
 
     <script src="assets/js/api.js"></script>
     <script src="assets/js/auth.js"></script>
-    
     <script>
-        // 1. ตรวจสอบการล็อกอินก่อน
+        // Check authentication
         requireAuth();
 
-        // 2. "นิยาม" ฟังก์ชันไว้ก่อน (ยังไม่ทำงาน)
-        async function loadEquipment() {
-            try {
-                const response = await equipmentAPI.getAvailable();
-                const select = document.getElementById('equipment');
-                
-                if (!response.results) {
-                    console.error('Invalid response structure from getAvailable()');
-                    showError('ข้อมูลอุปกรณ์ที่ได้รับผิดพลาด');
-                    return;
-                }
+       // Load equipment list
+async function loadEquipment() {
+    try {
+        const token = localStorage.getItem('token');
 
-                response.results.forEach(equipment => {
-                    const option = document.createElement('option');
-                    option.value = equipment.id;
-                    
-                    // [FIX 3] แก้เป็น equipment.code (จาก equipment.equipment_code)
-                    option.textContent = `${equipment.code} - ${equipment.name} (${equipment.location})`; 
-                    
-                    select.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Error loading equipment:', error);
-                showError('ไม่สามารถโหลดรายการอุปกรณ์ได้');
-            }
-        }
-
-        // 3. "รอ" ให้ HTML โหลดเสร็จก่อน
-        document.addEventListener('DOMContentLoaded', () => {
-            
-            // 4. "เรียกใช้" ฟังก์ชันโหลด dropdown
-            loadEquipment();
-
-            // 5. "ค้นหา" ฟอร์มและ "เพิ่ม" event listener (ย้ายจากข้างนอกเข้ามาข้างใน)
-            const form = document.getElementById('createRequestForm');
-            
-            if (form) {
-                form.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-
-                    const errorDiv = document.getElementById('errorMessage');
-                    const successDiv = document.getElementById('successMessage');
-                    errorDiv.style.display = 'none';
-                    successDiv.style.display = 'none';
-
-                    // (ใช้ตัวแปร form ที่หาเจอแล้ว)
-                    const formData = new FormData(form);
-                    const data = {
-                        equipment: parseInt(formData.get('equipment')),
-                        title: formData.get('title'),
-                        description: formData.get('description'),
-                        priority: formData.get('priority')
-                    };
-
-                    try {
-                        // ตรวจสอบว่าเลือกอุปกรณ์หรือยัง
-                        if (!data.equipment) {
-                            throw { equipment: ['กรุณาเลือกอุปกรณ์'] };
-                        }
-                        
-                        const result = await repairAPI.create(data);
-                        
-                        successDiv.style.display = 'block';
-                        successDiv.textContent = `สร้างคำร้องสำเร็จ! เลขที่คำร้อง: ${result.request_number}`;
-
-                        form.reset();
-
-                        setTimeout(() => {
-                            window.location.href = 'repair-requests.html';
-                        }, 2000);
-
-                    } catch (error) {
-                        console.error('Error creating request:', error);
-                        errorDiv.style.display = 'block';
-                        
-                        if (error.equipment) {
-                            errorDiv.textContent = 'กรุณาเลือกอุปกรณ์';
-                        } else if (error.title) {
-                            errorDiv.textContent = 'กรุณากรอกหัวข้อ';
-                        } else if (error.description) {
-                            errorDiv.textContent = 'กรุณากรอกรายละเอียดปัญหา';
-                        } else {
-                            errorDiv.textContent = 'ไม่สามารถสร้างคำร้องได้ กรุณาลองใหม่อีกครั้ง';
-                        }
-                    }
-                });
-            } else {
-                console.error("CRITICAL ERROR: ไม่พบ Form ที่มี id 'createRequestForm'");
-                showError("เกิดข้อผิดพลาดในการโหลดฟอร์ม");
+        const response = await fetch('http://127.0.0.1:8000/api/equipment/', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                // ไม่ต้องบังคับส่ง token ถ้า backend ใช้ AllowAny
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
             }
         });
+
+        if (!response.ok) {
+            throw new Error('ไม่สามารถโหลดอุปกรณ์ได้');
+        }
+
+        const data = await response.json();
+
+        // รองรับทั้งสองรูปแบบ: แบบมี pagination และแบบ list ตรง ๆ
+        const equipments = Array.isArray(data) ? data : data.results || [];
+
+        console.log('โหลดอุปกรณ์สำเร็จ:', equipments);
+
+        const select = document.getElementById('equipment');
+        select.innerHTML = '<option value="">-- กรุณาเลือกอุปกรณ์ --</option>';
+
+        if (equipments.length === 0) {
+            const option = document.createElement('option');
+            option.value = "";
+            option.textContent = "ไม่มีข้อมูลอุปกรณ์";
+            select.appendChild(option);
+        } else {
+            equipments.forEach(equipment => {
+                const option = document.createElement('option');
+                option.value = equipment.id;
+                option.textContent = `${equipment.equipment_code} - ${equipment.name} (${equipment.location})`;
+                select.appendChild(option);
+            });
+        }
+
+    } catch (error) {
+        console.error('Error loading equipment:', error);
+        const errorDiv = document.getElementById('errorMessage');
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = 'ไม่สามารถโหลดรายการอุปกรณ์ได้';
+    }
+}
+
+        // Handle form submission
+        document.getElementById('createRequestForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const errorDiv = document.getElementById('errorMessage');
+            const successDiv = document.getElementById('successMessage');
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+
+            const formData = {
+                equipment: parseInt(document.getElementById('equipment').value),
+                title: document.getElementById('title').value,
+                description: document.getElementById('description').value,
+                priority: document.getElementById('priority').value
+            };
+
+            try {
+                const result = await repairAPI.create(formData);
+                
+                successDiv.style.display = 'block';
+                successDiv.textContent = `สร้างคำร้องสำเร็จ! เลขที่คำร้อง: ${result.request_number}`;
+
+                // Reset form
+                document.getElementById('createRequestForm').reset();
+
+                // Redirect after 2 seconds
+                setTimeout(() => {
+                    window.location.href = 'repair-requests.html';
+                }, 2000);
+
+            } catch (error) {
+                console.error('Error creating request:', error);
+                errorDiv.style.display = 'block';
+                
+                if (error.equipment) {
+                    errorDiv.textContent = 'กรุณาเลือกอุปกรณ์';
+                } else if (error.title) {
+                    errorDiv.textContent = 'กรุณากรอกหัวข้อ';
+                } else if (error.description) {
+                    errorDiv.textContent = 'กรุณากรอกรายละเอียดปัญหา';
+                } else {
+                    errorDiv.textContent = 'ไม่สามารถสร้างคำร้องได้ กรุณาลองใหม่อีกครั้ง';
+                }
+            }
+        });
+
+        // Load equipment on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadEquipment();
+        });
     </script>
-    </body>
+</body>
 </html>
