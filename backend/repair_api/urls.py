@@ -1,32 +1,70 @@
-# repair_api/urls.py
-
+"""
+URL configuration for repair_project project.
+"""
+from django.contrib import admin
 from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from . import views
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import permissions
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
 
-router = DefaultRouter()
-router.register(r'categories', views.EquipmentCategoryViewSet, basename='category')
-router.register(r'equipment', views.EquipmentViewSet, basename='equipment')
-router.register(r'repair-requests', views.RepairRequestViewSet, basename='repair-request')
-router.register(r'profiles', views.UserProfileViewSet, basename='profile')
-router.register(r'auth', views.RegisterView, basename='auth')
+# Schema view สำหรับ API documentation
+schema_view = get_schema_view(
+    openapi.Info(
+        title="Repair System API",
+        default_version='v1',
+        description="API Documentation for Repair System",
+        terms_of_service="https://www.google.com/policies/terms/",
+        contact=openapi.Contact(email="contact@repairsystem.local"),
+        license=openapi.License(name="BSD License"),
+    ),
+    public=True,
+    permission_classes=(permissions.AllowAny,),
+)
+
+# Health check view
+@csrf_exempt
+def health_check(request):
+    """Simple health check endpoint"""
+    return JsonResponse({
+        'status': 'ok',
+        'message': 'Repair System API is running',
+        'version': '1.0.0'
+    })
+
+# Home/Root view
+@csrf_exempt
+def home_view(request):
+    """Root endpoint with API information"""
+    return JsonResponse({
+        'message': 'Welcome to Repair System API',
+        'version': '1.0.0',
+        'endpoints': {
+            'admin': '/admin/',
+            'api': '/api/',
+            'docs': '/swagger/',
+            'redoc': '/redoc/',
+            'health': '/health/'
+        },
+        'status': 'active'
+    })
 
 urlpatterns = [
-    # JWT Authentication
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    # Admin
+    path('admin/', admin.site.urls),
     
-    # Custom endpoints
-    path('dashboard/stats/', views.dashboard_stats, name='dashboard_stats'),
-    path('technicians/', views.technician_list, name='technician_list'),
+    # Root endpoint
+    path('', home_view, name='home'),
     
-    # Router URLs
-    path('', include(router.urls)),
+    # Health check
+    path('health/', health_check, name='health'),
     
-    path('categories/', views.equipment_category_list),
-    path('get-equipment/', 
-     views.EquipmentViewSet.as_view({'get': 'available'}), 
-     name='get-equipment-list-js'
-),
+    # API endpoints
+    path('api/', include('repair_api.urls')),
+    
+    # API Documentation
+    path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 ]
